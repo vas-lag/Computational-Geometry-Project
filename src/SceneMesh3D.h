@@ -39,7 +39,7 @@ private:
 	float m_plane_d;
 	vvr::Canvas2D m_canvas;
 	vvr::Colour m_obj_col;
-	vvr::Mesh m_model_original, m_model;
+	vvr::Mesh m_model_original, m_model, m_model_new;
 	vvr::Box3D m_aabb;
 	math::vec m_center_mass;
 	math::vec m_pca_cen;
@@ -49,3 +49,5 @@ private:
 	std::vector<vvr::Point3D> m_points3D;
 	std::vector<vvr::Triangle3D> m_triangles3D;
 };
+
+void shuffle_arr(int*, size_t);

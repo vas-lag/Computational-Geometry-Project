@@ -1,11 +1,14 @@
 #include "SceneMesh3D.h"
 #include "Eigen/Dense"
 #include "iostream"
+#include "fstream"
 #include "Eigen/Sparse"
 #include "Eigen/Eigenvalues"
-//#include "Eigen/LU"
+#include "Eigen/SparseCholesky"
+#include "ctime"
 
-#define RATIO 1.0
+#define RATIO 0.1
+#define FILENAME "dolphin"
 
 using namespace std;
 using namespace vvr;
@@ -20,8 +23,9 @@ Mesh3DScene::Mesh3DScene()
 	m_bg_col = Colour("768E77");
 	m_obj_col = Colour("454545");
 	const string objDir = getBasePath() + "resources/obj/";
-	const string objFile = objDir + "cube.obj";
+	const string objFile = objDir + FILENAME + ".obj";
 	m_model_original = vvr::Mesh(objFile);
+	m_model_new = vvr::Mesh(m_model_original);
 	reset();
 }
 
@@ -29,17 +33,12 @@ void Mesh3DScene::reset()
 {
 	Scene::reset();
 
-	//! Define plane
-	m_plane_d = 0;
-	m_plane = Plane(vec(0, 1, 1).Normalized(), m_plane_d);
-
 	//! Define what will be vissible by default
 	m_style_flag = 0;
 	m_style_flag |= FLAG_SHOW_SOLID;
 	m_style_flag |= FLAG_SHOW_WIRE;
 	m_style_flag |= FLAG_SHOW_AXES;
 	m_style_flag |= FLAG_SHOW_AABB;
-	//m_style_flag |= FLAG_SHOW_PLANE;
 }
 
 void Mesh3DScene::resize()
@@ -53,6 +52,8 @@ void Mesh3DScene::resize()
 	{
 		m_model_original.setBigSize(getSceneWidth() / 2);
 		m_model_original.update();
+		m_model_new.setBigSize(getSceneWidth() / 2);
+		m_model_new.update();
 		m_model = m_model_original;
 		Tasks();
 		first_pass = false;
@@ -68,6 +69,9 @@ void Mesh3DScene::Tasks()
 	int trianglesCount = m_triangles.size();
 	cout << "verticesCount = " << verticesCount << endl;
 	//
+	for (int i = 0; i < verticesCount; i++) {
+		//cout << m_vertices[i] << endl;
+	}
 	//Task1
 	/*/
 	MatrixXd A = MatrixXd::Zero(verticesCount, verticesCount);
@@ -122,6 +126,17 @@ void Mesh3DScene::Tasks()
 	SparseMatrix<double> L(verticesCount, verticesCount);
 	//*/
 	L = I - D_inverse * A;
+	//MatrixXd Ls = D - A;
+
+	/*
+	for (int i = 0; i < verticesCount; i++) {
+		for (int j = 0; j < verticesCount; j++) {
+			cout << L.coeffRef(i, j) << "  ";
+		}
+		cout << endl;
+	}
+	*/
+
 	MatrixXd Coords(verticesCount, 3);
 	MatrixXd DifCoords(verticesCount, 3);
 	for (int i = 0; i < verticesCount; i++) {
@@ -129,7 +144,17 @@ void Mesh3DScene::Tasks()
 		Coords(i, 1) = (double)m_vertices[i].y;
 		Coords(i, 2) = (double)m_vertices[i].z;
 	}
+
+	cout << "print Coords" << endl;
+	for (int i = 0; i < verticesCount; i++) {
+		for (int j = 0; j < 3; j++) {
+			//cout << Coords(i, j) << "  ";
+		}
+		//cout << endl;
+	}
+
 	DifCoords = L * Coords;
+
 	//find max of dif coords on each axis
 	double maxX = 0;
 	double maxY = 0;
@@ -144,6 +169,7 @@ void Mesh3DScene::Tasks()
 	}
 	//
 	//*
+	MatrixXd newDifCoords(verticesCount, 3);
 	for (int i = 0; i < verticesCount; i++) {
 		vec normal = vec(0, 0, 0);
 		for (int j = 0; j < trianglesCount; j++) {
@@ -160,17 +186,17 @@ void Mesh3DScene::Tasks()
 		//cout << normal.x << "   " << normal.y << "   " << normal.z << endl;
 		vec oldDifCoord = vec(DifCoords(i, 0), DifCoords(i, 1), DifCoords(i, 2));
 		vec newDifCoord = (oldDifCoord.Dot(normal) * (normal/(normal.x*normal.x + normal.y*normal.y + normal.z*normal.z)));
-		DifCoords(i, 0) = newDifCoord.x;
-		DifCoords(i, 1) = newDifCoord.y;
-		DifCoords(i, 2) = newDifCoord.z;
-		//cout << DifCoords(i, 0) << "   " << DifCoords(i, 1) << "   " << DifCoords(i, 2) << endl;
+		newDifCoords(i, 0) = newDifCoord.x;
+		newDifCoords(i, 1) = newDifCoord.y;
+		newDifCoords(i, 2) = newDifCoord.z;
+		//cout << newDifCoords(i, 0) << "   " << newDifCoords(i, 1) << "   " << newDifCoords(i, 2) << endl;
 	}
 	//*/
 	//compute the magnitude of the dif coords of all the vertices
 	VectorXd DifCoordsMagnitude(verticesCount);
 	double maxMag = 0;
 	for (int i = 0; i < verticesCount; i++) {
-		DifCoordsMagnitude(i) = sqrt(DifCoords(i, 0) * DifCoords(i, 0) + DifCoords(i, 1) * DifCoords(i, 1) + DifCoords(i, 2) * DifCoords(i, 2));
+		DifCoordsMagnitude(i) = sqrt(newDifCoords(i, 0) * newDifCoords(i, 0) + newDifCoords(i, 1) * newDifCoords(i, 1) + newDifCoords(i, 2) * newDifCoords(i, 2));
 		if (DifCoordsMagnitude(i) > maxMag)
 			maxMag = DifCoordsMagnitude(i);
 		//cout << DifCoordsMagnitude(i) << endl;
@@ -192,9 +218,9 @@ void Mesh3DScene::Tasks()
 		m_triangles3D[i].setColourPerVertex(vvr::Colour((DifCoordsMagnitude(m_triangles[i].vi1) / maxMag) * 255, (1 - (DifCoordsMagnitude(m_triangles[i].vi1) / maxMag)) * 255, 0),
 			vvr::Colour((DifCoordsMagnitude(m_triangles[i].vi2) / maxMag) * 255, (1 - (DifCoordsMagnitude(m_triangles[i].vi2) / maxMag)) * 255, 0),
 			vvr::Colour((DifCoordsMagnitude(m_triangles[i].vi3) / maxMag) * 255, (1 - (DifCoordsMagnitude(m_triangles[i].vi3) / maxMag)) * 255, 0));
-		//m_triangles3D[i].setColourPerVertex(vvr::Colour(abs(DifCoords(m_triangles[i].vi1, 0) / maxX) * 255, abs(DifCoords(m_triangles[i].vi1, 1) / maxY) * 255, abs(DifCoords(m_triangles[i].vi1, 2) / maxZ) * 255),
-		//vvr::Colour(abs(DifCoords(m_triangles[i].vi2, 0) / maxX) * 255, abs(DifCoords(m_triangles[i].vi2, 1) / maxY) * 255, abs(DifCoords(m_triangles[i].vi2, 2) / maxZ) * 255),
-		//vvr::Colour(abs(DifCoords(m_triangles[i].vi3, 0) / maxX) * 255, abs(DifCoords(m_triangles[i].vi3, 1) / maxY) * 255, abs(DifCoords(m_triangles[i].vi3, 2) / maxZ) * 255));
+		//m_triangles3D[i].setColourPerVertex(vvr::Colour(abs(newDifCoords(m_triangles[i].vi1, 0) / maxX) * 255, abs(newDifCoords(m_triangles[i].vi1, 1) / maxY) * 255, abs(newDifCoords(m_triangles[i].vi1, 2) / maxZ) * 255),
+		//vvr::Colour(abs(newDifCoords(m_triangles[i].vi2, 0) / maxX) * 255, abs(newDifCoords(m_triangles[i].vi2, 1) / maxY) * 255, abs(newDifCoords(m_triangles[i].vi2, 2) / maxZ) * 255),
+		//vvr::Colour(abs(newDifCoords(m_triangles[i].vi3, 0) / maxX) * 255, abs(newDifCoords(m_triangles[i].vi3, 1) / maxY) * 255, abs(newDifCoords(m_triangles[i].vi3, 2) / maxZ) * 255));
 	}
 	//*/
 	//
@@ -203,68 +229,117 @@ void Mesh3DScene::Tasks()
 	//Task2
 	//*
 	cout << "Task1 done" << endl;
+	
 	MatrixXd Ls = D - A;
+	/*
 	for (int i = 0; i < verticesCount; i++) {
 		//cout << L.coeffRef(0, i) << endl;
 	}
 	for (int i = 0; i < verticesCount; i++) {
 		for (int j = 0; j < verticesCount; j++) {
-			//cout << Ls(i, j)<<"  ";
+			cout << Ls(i, j)<<"  ";
 		}
-		//cout << endl;
+		cout << endl;
 	}
-	EigenSolver<MatrixXd> solver;
-	solver.compute(Ls); //Ls
+	//*/
 	//
 	VectorXd eigenValues(verticesCount);
 	MatrixXd eigenVectors(verticesCount, verticesCount);
 	//
+	/*
+	//compute eigenvalues and eigenvectors
+	//EigenSolver<MatrixXd> solver;
+	SelfAdjointEigenSolver<MatrixXd> solver;
+	solver.compute(Ls); //Ls
+	//
 	eigenValues = solver.eigenvalues().real();
 	eigenVectors = solver.eigenvectors().real();
-	//
-	//std::sort(eigenValues.data(), eigenValues.data() + eigenValues.size());
-	cout << "sort" << endl;
-	//*
-	//sort eigenvalues in increasing order 
-	//and their eigenvectors accordingly
+	//*/
+	/*
 	for (int i = 0; i < verticesCount; i++) {
-		for (int j = i + 1; j < verticesCount; j++) {
-			if (eigenValues(i) > eigenValues(j)) {
-				double temp = eigenValues(i);
-				eigenValues(i) = eigenValues(j);
-				eigenValues(j) = temp;
-				for (int k = 0; k < verticesCount; k++) {
-					temp = eigenVectors(k, i);
-					eigenVectors(k, i) = eigenVectors(k, j);
-					eigenVectors(k, j) = temp;
-				}
+		for (int j = 0; j < verticesCount; j++) {
+			if (eigenVectors(i, j) < 1.0e-9) {
+				eigenVectors(i, j) = 0;
 			}
 		}
 	}
+	//*/
 	//
+	const string eigenDir = getBasePath() + "resources/eigen/";
+	const string eigenFile = eigenDir + FILENAME + ".txt";
+	//save eigenvalues and eigenvectors to file
+	/*
+	ofstream myfile;
+	myfile.open(eigenFile);
+	myfile << verticesCount << "\n\n";
+	myfile << eigenValues << "\n\n";
+	myfile << eigenVectors;
+	myfile.close();
+	//*/
+	//
+	//*
+	ifstream myfile;
+	myfile.open(eigenFile);
+	double count;
+	myfile >> count;
 	for (int i = 0; i < verticesCount; i++) {
-		//cout << eigenValues(i) << endl;
+		myfile >> eigenValues(i);
 	}
+	for (int i = 0; i < verticesCount; i++) {
+		for (int j = 0; j < verticesCount; j++) {
+			myfile >> eigenVectors(i, j);
+		}
+	}
+	myfile.close();
+	//*/
+	//
+	/*
+	for (int i = 0; i < verticesCount; i++) {
+		cout << eigenValues(i) << endl;
+	}
+	for (int i = 0; i < verticesCount; i++) {
+		for (int j = 0; j < verticesCount; j++) {
+			cout << eigenVectors(i, j) << "   ";
+		}
+		cout << endl;
+	}
+	//*/
+	//*
 	MatrixXd Lamda = MatrixXd::Zero(verticesCount, verticesCount);
 	for (int i = 0; i < verticesCount; i++) {
 		Lamda(i, i) = eigenValues(i);
 	}
 	MatrixXd Q = eigenVectors;
-	//*
+	//*/
+	/*
 	for (int i = RATIO * verticesCount; i < verticesCount; i++) {
 		Lamda(i, i) = 0;
-		cout << "cut" << endl;
+		//cout << "cut" << endl;
 		for (int j = 0; j < verticesCount; j++) {
 			Q(j, i) = 0;
 		}
 	}
 	//*/
-	MatrixXd LsNew = (Q * Lamda) * Q.inverse(); //same as eigenVectors.inverse();
+	//*
+	MatrixXd LsNew = (Q * Lamda) * Q.transpose(); //same as Q.inverse();
 	for (int i = 0; i < verticesCount; i++) {
 		//cout << LsNew(0, i) << endl;
 	}
+
+	MatrixXd temp = LsNew;
+	//LsNew = D_inverse * temp;
+
+
 	//*/
-	
+	/*
+	cout << "\n\noriginal:" << endl;
+	for (int i = 0; i < verticesCount; i++) {
+		for (int j = 0; j < verticesCount; j++) {
+			//cout << LsNew(i, j) << "  ";
+		}
+		//cout << endl;
+	}
+	//*/
 	//*
 	MatrixXd LNew = D_inverse * LsNew;
 	for (int i = 0; i < verticesCount; i++) {
@@ -273,27 +348,120 @@ void Mesh3DScene::Tasks()
 
 	for (int i = 0; i < verticesCount; i++) {
 		for (int j = 0; j < verticesCount; j++) {
-			cout << LNew(i, j)<<"  ";
+			//cout << LNew(i, j)<<"  ";
 		}
-		cout << endl;
+		//cout << endl;
 	}
+	//*/
+	/*
+	//CompleteOrthogonalDecomposition<MatrixXd> co_decomp(LsNew);
+	ColPivHouseholderQR<MatrixXd> col_decomp(LsNew);
+	cout << "rank = " << col_decomp.rank() << endl;
+	int rank;
+	int dimCount = verticesCount;
+	//
+	int *options = new int[verticesCount];
+	for (int i = 0; i < verticesCount; i++) {
+		options[i] = i;
+	}
+	shuffle_arr(options, verticesCount);
+	//
+	while (true) {
+		dimCount++;
+		int count = dimCount - verticesCount - 1;
+		LsNew.conservativeResize(dimCount, NoChange);
+		for (int i = 0; i < verticesCount; i++) {
+			LsNew(dimCount - 1, i) = 0;
+		}
+		LsNew(dimCount - 1, options[count]) = 1;
+		//
+		DifCoords.conservativeResize(dimCount, NoChange);
+		for (int i = 0; i < 3; i++) {
+			DifCoords(dimCount - 1, i) = Coords(options[count], i);
+		}
+		//
+		//CompleteOrthogonalDecomposition<MatrixXd> co_decomp(LsNew);
+		//*
+		ColPivHouseholderQR<MatrixXd> col_decomp(LsNew);
+		rank = col_decomp.rank();
+		cout << "rank = " << rank << endl;
+		if (rank >= verticesCount) {
+			cout << "hehehe" << endl;
+			break;
+		}
+		//*/
+		//
+		/*
+		if (count >= (1 - RATIO) * verticesCount) {
+			ColPivHouseholderQR<MatrixXd> col_decomp(LsNew);
+			rank = col_decomp.rank();
+			cout << "rank = " << rank << endl;
+			//break;
+		}
+		//*/
+	//}
+	/*
+	for (int i = 0; i < dimCount; i++) {
+		for (int j = 0; j < verticesCount; j++) {
+			//cout << LsNew(i, j) << "  ";
+		}
+		//cout << endl;
+	}
+	//*/
 
-	FullPivLU<MatrixXd> lu_decomp(LNew);
-	cout << "rank = " << lu_decomp.rank() << endl;
+	//*
+	MatrixXd Xtilda = Q.transpose() * Coords;
+	for (int i = RATIO * verticesCount; i < verticesCount; i++) {
+		for (int j = 0; j < verticesCount; j++) {
+			Q(j, i) = 0;
+		}
+		for (int j = 0; j < 3; j++) {
+			Xtilda(i, j) = 0;
+		}
+	}
+	//*/
+
+	//*
+	MatrixXd CoordsNew(verticesCount, 3);
+	//CoordsNew = ((LsNew.transpose() * LsNew).inverse()) * LsNew.transpose() * DifCoords;
+	CoordsNew = Q * Xtilda;
+	
+	cout << "print new Coords" << endl;
+	for (int i = 0; i < verticesCount; i++) {
+		for (int j = 0; j < 3; j++) {
+			//cout << CoordsNew(i, j) << "  ";
+		}
+		//cout << endl;
+	}
+	
+	vector<vec>& m_vertices_new = m_model_new.getVertices();
+	for (int i = 0; i < verticesCount; i++) {
+		m_vertices_new[i].x = CoordsNew(i, 0);
+		m_vertices_new[i].y = CoordsNew(i, 1);
+		m_vertices_new[i].z = CoordsNew(i, 2);
+	}
+	//*/
+
 
 	cout << "done!!!" << endl;
-	//*/
+}
+
+void shuffle_arr(int* arr, size_t n) {
+	if (n > 1) {
+		size_t i;
+		srand(time(NULL));
+		for (i = 0; i < n - 1; i++) {
+			size_t j = i + rand() / (RAND_MAX / (n - i) + 1);
+			int t = arr[j];
+			arr[j] = arr[i];
+			arr[i] = t;
+		}
+	}
 }
 
 void Mesh3DScene::arrowEvent(ArrowDir dir, int modif)
 {
-	math::vec n = m_plane.normal;
-	if (dir == UP) m_plane_d += 1;
-	if (dir == DOWN) m_plane_d -= 1;
-	else if (dir == LEFT) n = math::float3x3::RotateY(DegToRad(1)).Transform(n);
-	else if (dir == RIGHT) n = math::float3x3::RotateY(DegToRad(-1)).Transform(n);
-	m_plane = Plane(n.Normalized(), m_plane_d);
- 
+
 }
 
 void Mesh3DScene::keyEvent(unsigned char key, bool up, int modif)
@@ -307,29 +475,24 @@ void Mesh3DScene::keyEvent(unsigned char key, bool up, int modif)
 	case 'w': m_style_flag ^= FLAG_SHOW_WIRE; break;
 	case 'n': m_style_flag ^= FLAG_SHOW_NORMALS; break;
 	case 'a': m_style_flag ^= FLAG_SHOW_AXES; break;
-	case 'p': m_style_flag ^= FLAG_SHOW_PLANE; break;
 	case 'b': m_style_flag ^= FLAG_SHOW_AABB; break;
 	}
 }
 
 void Mesh3DScene::draw()
 {
-	//! Draw plane
-	if (m_style_flag & FLAG_SHOW_PLANE) {
-		vvr::Colour colPlane(0x41, 0x14, 0xB3);
-		float u = 20, v = 20;
-		math::vec p0(m_plane.Point(-u, -v, math::vec(0, 0, 0)));
-		math::vec p1(m_plane.Point(-u, v, math::vec(0, 0, 0)));
-		math::vec p2(m_plane.Point(u, -v, math::vec(0, 0, 0)));
-		math::vec p3(m_plane.Point(u, v, math::vec(0, 0, 0)));
-		math2vvr(math::Triangle(p0, p1, p2), colPlane).draw();
-		math2vvr(math::Triangle(p2, p1, p3), colPlane).draw();
-	}
-
+	/*
 	if (m_style_flag & FLAG_SHOW_SOLID) m_model.draw(m_obj_col, SOLID);
 	if (m_style_flag & FLAG_SHOW_WIRE) m_model.draw(Colour::black, WIRE);
 	if (m_style_flag & FLAG_SHOW_NORMALS) m_model.draw(Colour::black, NORMALS);
 	if (m_style_flag & FLAG_SHOW_AXES) m_model.draw(Colour::black, AXES);
+	//*/
+	//*
+	if (m_style_flag & FLAG_SHOW_SOLID) m_model_new.draw(m_obj_col, SOLID);
+	if (m_style_flag & FLAG_SHOW_WIRE) m_model_new.draw(Colour::black, WIRE);
+	if (m_style_flag & FLAG_SHOW_NORMALS) m_model_new.draw(Colour::black, NORMALS);
+	if (m_style_flag & FLAG_SHOW_AXES) m_model_new.draw(Colour::black, AXES);
+	//*/
 
 	//*
 	for (int i = 0; i < m_points3D.size(); i++) {
@@ -337,7 +500,7 @@ void Mesh3DScene::draw()
 	 }
 	 //*/
 	for (int i = 0; i < m_triangles3D.size(); i++) {
-		m_triangles3D[i].draw();
+		//m_triangles3D[i].draw();
 	}
 }
  
