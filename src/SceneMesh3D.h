@@ -10,6 +10,10 @@
 #include <set>
 #include "symmetriceigensolver3x3.h"
 #include "canvas.h"
+#include "Eigen/Dense"
+#include "Eigen/Sparse"
+#include "Eigen/Eigenvalues"
+#include "Eigen/SparseCholesky"
 
 #define FLAG_SHOW_AXES       1
 #define FLAG_SHOW_WIRE       2
@@ -17,7 +21,10 @@
 #define FLAG_SHOW_NORMALS    8
 #define FLAG_SHOW_PLANE     16
 #define FLAG_SHOW_AABB      32
-
+#define FLAG_SHOW_DIFCOORDS 64
+#define FLAG_SHOW_ORIGINAL_MODEL 128
+#define FLAG_SHOW_POINTS 256
+#define FLAG_SHOW_TRIANGLES 512
 
 class Mesh3DScene : public vvr::Scene
 {
@@ -32,7 +39,8 @@ private:
 	void reset() override;
 	void resize() override;
 	void Tasks();
-	void Task1(std::vector<vvr::Triangle>& m_triangles, std::vector<vec>& m_vertices);// , Eigen::MatrixXd& L, Eigen::MatrixXd& A, Eigen::MatrixXd& D);
+	void Task1(std::vector<vvr::Triangle>& m_triangles, std::vector<vec>& m_vertices);
+	void Task4(std::vector<vvr::Triangle>& m_triangles, std::vector<vec>& m_vertices_new, const Eigen::MatrixXd& Coords, const Eigen::MatrixXd& CoordsNew, const Eigen::MatrixXd& DifCoords, const Eigen::MatrixXd& DifCoordsNew, const Eigen::MatrixXd& L);
 
 private:
 	int m_style_flag;
@@ -46,8 +54,7 @@ private:
 	math::vec m_pca_dir;
 	math::Plane m_plane;
 	std::vector<int> m_intersections;
-	std::vector<vvr::Point3D> m_points3D;
-	std::vector<vvr::Triangle3D> m_triangles3D;
+	std::vector<vvr::Point3D> m_points3D, m_points_coords3D, m_points_difCoords3D;
+	std::vector<vvr::Triangle3D> m_triangles3D, m_triangles_coords3D, m_triangles_difCoords3D;
 };
 
-void shuffle_arr(int*, size_t);
