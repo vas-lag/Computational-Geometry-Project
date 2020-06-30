@@ -12,6 +12,7 @@
 #include "canvas.h"
 #include "Eigen/Dense"
 #include "Eigen/Sparse"
+#include "Eigen/SparseQR"
 #include "Eigen/Eigenvalues"
 #include "Eigen/SparseCholesky"
 
@@ -41,14 +42,17 @@ private:
 	void Tasks();
 	void Task1(std::vector<vvr::Triangle>& m_triangles, std::vector<vec>& m_vertices, Eigen::SparseMatrix<double>& I, Eigen::SparseMatrix<double>& A, Eigen::SparseMatrix<double>& D, Eigen::SparseMatrix<double>& D_inverse, Eigen::SparseMatrix<double>& L, Eigen::MatrixXd& Coords, Eigen::MatrixXd& DifCoords);
 	void Task2(Eigen::MatrixXd& Ls, Eigen::VectorXd& eigenValues, Eigen::MatrixXd& eigenVectors, int verticesCount);
-	void Task3(Eigen::MatrixXd& Q, Eigen::MatrixXd& Coords, Eigen::MatrixXd& DifCoords, Eigen::MatrixXd& CoordsNewA, Eigen::MatrixXd& DifCoordsNewA, Eigen::MatrixXd& CoordsNewB, Eigen::MatrixXd& DifCoordsNewB, Eigen::MatrixXd& CoordsNewC, Eigen::MatrixXd& DifCoordsNewC, Eigen::MatrixXd& CoordsNewD, Eigen::MatrixXd& DifCoordsNewD, Eigen::MatrixXd& Ls, int verticesCount);
-	void Task3Sub(Eigen::MatrixXd& Q, Eigen::MatrixXd& Coords, Eigen::MatrixXd& DifCoords, Eigen::MatrixXd& Ls, Eigen::MatrixXd& CoordsNew, Eigen::MatrixXd& DifCoordsNew, std::vector<vec>& m_vertices_new, int verticesCount, double ratio);
+	void Task3(Eigen::MatrixXd& Q, Eigen::MatrixXd& Coords, Eigen::MatrixXd& DifCoords, Eigen::MatrixXd& CoordsNewA, Eigen::MatrixXd& DifCoordsNewA, Eigen::MatrixXd& CoordsNewB, Eigen::MatrixXd& DifCoordsNewB, Eigen::MatrixXd& CoordsNewC, Eigen::MatrixXd& DifCoordsNewC, Eigen::MatrixXd& CoordsNewD, Eigen::MatrixXd& DifCoordsNewD, int verticesCount, Eigen::SparseMatrix<double>& L);
+	void Task3Sub(Eigen::MatrixXd& Q, Eigen::MatrixXd& Coords, Eigen::MatrixXd& DifCoords, Eigen::MatrixXd& CoordsNew, Eigen::MatrixXd& DifCoordsNew, std::vector<vec>& m_vertices_new, int verticesCount, double ratio, Eigen::SparseMatrix<double>& L);
 	void Task4(const Eigen::MatrixXd& Coords, const Eigen::MatrixXd& CoordsNewA, const Eigen::MatrixXd& CoordsNewB, const Eigen::MatrixXd& CoordsNewC, const Eigen::MatrixXd& CoordsNewD, const Eigen::MatrixXd& DifCoords, const Eigen::MatrixXd& DifCoordsNewA, const Eigen::MatrixXd& DifCoordsNewB, const Eigen::MatrixXd& DifCoordsNewC, const Eigen::MatrixXd& DifCoordsNewD, const Eigen::MatrixXd& L);
 	void Task4Sub(std::vector<vvr::Triangle>& m_triangles, std::vector<vec>& m_vertices_new, std::vector<vvr::Point3D>& m_points_coords_3D, std::vector<vvr::Triangle3D>& m_triangles_coords3D, std::vector<vvr::Point3D>& m_points_difCoords_3D, std::vector<vvr::Triangle3D>& m_triangles_difCoords3D, const Eigen::MatrixXd& Coords, const Eigen::MatrixXd& CoordsNew, const Eigen::MatrixXd& DifCoords, const Eigen::MatrixXd& DifCoordsNew, const Eigen::MatrixXd& L);
 	void GetDifCoordsInNormalDirection(std::vector<vvr::Triangle>& m_triangles, std::vector<vec>& m_vertices, Eigen::MatrixXd& DifCoords, Eigen::MatrixXd& newDifCoords);
 	void ComputeEigenDecomposition(Eigen::MatrixXd& Ls, Eigen::VectorXd& eigenValues, Eigen::MatrixXd& eigenVectors);
 	void SaveEigenToFile(const std::string eigenFile, Eigen::VectorXd& eigenValues, Eigen::MatrixXd& eigenVectors, int verticesCount);
 	void ReadEigenFromFile(const std::string eigenFile, Eigen::VectorXd& eigenValues, Eigen::MatrixXd& eigenVectors, int verticesCount);
+	void SaveCoordsToFile(const std::string coordsFile, Eigen::MatrixXd& CoordsNewA, Eigen::MatrixXd& DifCoordsNewA, Eigen::MatrixXd& CoordsNewB, Eigen::MatrixXd& DifCoordsNewB, Eigen::MatrixXd& CoordsNewC, Eigen::MatrixXd& DifCoordsNewC, Eigen::MatrixXd& CoordsNewD, Eigen::MatrixXd& DifCoordsNewD);
+	void ReadCoordsFromFile(const std::string coordsFile, Eigen::MatrixXd& CoordsNewA, Eigen::MatrixXd& DifCoordsNewA, Eigen::MatrixXd& CoordsNewB, Eigen::MatrixXd& DifCoordsNewB, Eigen::MatrixXd& CoordsNewC, Eigen::MatrixXd& DifCoordsNewC, Eigen::MatrixXd& CoordsNewD, Eigen::MatrixXd& DifCoordsNewD, int verticesCount);
+	void CoordsToModel(std::vector<vec>& m_vertices_new, Eigen::MatrixXd& CoordsNew, int verticesCount);
 
 private:
 	int m_style_flag, ratio_flag;

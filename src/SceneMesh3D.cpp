@@ -1,10 +1,7 @@
 #include "SceneMesh3D.h"
-#include "iostream"
-#include "fstream"
 #include "ctime"
 
-//#define RATIO 0.05
-#define FILENAME "bone"
+#define FILENAME "phone_v02"
 
 using namespace std;
 using namespace vvr;
@@ -26,13 +23,16 @@ Mesh3DScene::Mesh3DScene()
 	m_model_newC = vvr::Mesh(m_model_original);
 	m_model_newD = vvr::Mesh(m_model_original);
 	m_model_new_draw = &m_model_newA;
+	m_points_coords3D_draw = &m_points_coords3DA;
+	m_points_difCoords3D_draw = &m_points_difCoords3DA;
+	m_triangles_coords3D_draw = &m_triangles_coords3DA;
+	m_triangles_difCoords3D_draw = &m_triangles_difCoords3DA;
 	reset();
 }
 
 void Mesh3DScene::reset()
 {
 	Scene::reset();
-
 	//! Define what will be vissible by default
 	m_style_flag = 0;
 	ratio_flag = 0;
@@ -87,7 +87,6 @@ void Mesh3DScene::Tasks()
 	Task1(m_triangles, m_vertices, I, A, D, D_inverse, L, Coords, DifCoords);
 	cout << "Task1 done" << endl;
 
-	//Task2
 	MatrixXd Ls = D - A;
 	VectorXd eigenValues(verticesCount);
 	MatrixXd eigenVectors(verticesCount, verticesCount);
@@ -111,7 +110,6 @@ void Mesh3DScene::Tasks()
 		cout << endl;
 	}
 	//*/
-	//Task3
 	MatrixXd Q = eigenVectors;
 	MatrixXd CoordsNewA(verticesCount, 3);
 	MatrixXd DifCoordsNewA(verticesCount, 3);
@@ -121,10 +119,10 @@ void Mesh3DScene::Tasks()
 	MatrixXd DifCoordsNewC(verticesCount, 3);
 	MatrixXd CoordsNewD(verticesCount, 3);
 	MatrixXd DifCoordsNewD(verticesCount, 3);
-	Ls = D_inverse * Ls;
-	Task3(Q, Coords, DifCoords, CoordsNewA, DifCoordsNewA, CoordsNewB, DifCoordsNewB, CoordsNewC, DifCoordsNewC, CoordsNewD, DifCoordsNewD, Ls, verticesCount);
+	MatrixXd LDense = L;
+	Task3(Q, Coords, DifCoords, CoordsNewA, DifCoordsNewA, CoordsNewB, DifCoordsNewB, CoordsNewC, DifCoordsNewC, CoordsNewD, DifCoordsNewD, verticesCount, L);
 	cout << "new Coords ready" << endl;
-	Task4(Coords, CoordsNewA, CoordsNewB, CoordsNewC, CoordsNewD, DifCoords, DifCoordsNewA, DifCoordsNewB, DifCoordsNewC, DifCoordsNewD, L);
+	Task4(Coords, CoordsNewA, CoordsNewB, CoordsNewC, CoordsNewD, DifCoords, DifCoordsNewA, DifCoordsNewB, DifCoordsNewC, DifCoordsNewD, LDense);
 	cout << "done!!!" << endl;
 }
 
@@ -147,6 +145,7 @@ void Mesh3DScene::Task1(vector<vvr::Triangle>& m_triangles, vector<vec>& m_verti
 	}
 	SparseDiagonalInverse(D, D_inverse, verticesCount);
 	L = I - D_inverse * A;
+	//L = D - A;
 	/*
 	for (int i = 0; i < verticesCount; i++) {
 		for (int j = 0; j < verticesCount; j++) {
@@ -201,26 +200,32 @@ void Mesh3DScene::Task2(MatrixXd& Ls, VectorXd& eigenValues, MatrixXd& eigenVect
 	cout << "fileIO complete" << endl;
 }
 
-void Mesh3DScene::Task3(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, MatrixXd& CoordsNewA, MatrixXd& DifCoordsNewA, MatrixXd& CoordsNewB, MatrixXd& DifCoordsNewB, MatrixXd& CoordsNewC, MatrixXd& DifCoordsNewC, MatrixXd& CoordsNewD, MatrixXd& DifCoordsNewD, MatrixXd& Ls, int verticesCount) {
+void Mesh3DScene::Task3(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, MatrixXd& CoordsNewA, MatrixXd& DifCoordsNewA, MatrixXd& CoordsNewB, MatrixXd& DifCoordsNewB, MatrixXd& CoordsNewC, MatrixXd& DifCoordsNewC, MatrixXd& CoordsNewD, MatrixXd& DifCoordsNewD, int verticesCount, SparseMatrix<double>& L) {
 	double ratios[4] = { 0.3, 0.1, 0.05, 0.01 };
+	//*
 	for (int i = 0; i < 4; i++) {
 		MatrixXd Qcopy = Q;
-		MatrixXd LsCopy = Ls;
+		SparseMatrix<double> LCopy = L;
 		if (i == 0)
-			Task3Sub(Qcopy, Coords, DifCoords, CoordsNewA, DifCoordsNewA, LsCopy, m_model_newA.getVertices(), verticesCount, ratios[i]);
+			Task3Sub(Qcopy, Coords, DifCoords, CoordsNewA, DifCoordsNewA, m_model_newA.getVertices(), verticesCount, ratios[i], LCopy);
 		if (i == 1)
-			Task3Sub(Qcopy, Coords, DifCoords, CoordsNewB, DifCoordsNewB, LsCopy, m_model_newB.getVertices(), verticesCount, ratios[i]);
+			Task3Sub(Qcopy, Coords, DifCoords, CoordsNewB, DifCoordsNewB, m_model_newB.getVertices(), verticesCount, ratios[i], LCopy);
 		if (i == 2)
-			Task3Sub(Qcopy, Coords, DifCoords, CoordsNewC, DifCoordsNewC, LsCopy, m_model_newC.getVertices(), verticesCount, ratios[i]);
+			Task3Sub(Qcopy, Coords, DifCoords, CoordsNewC, DifCoordsNewC, m_model_newC.getVertices(), verticesCount, ratios[i], LCopy);
 		if (i == 3)
-			Task3Sub(Qcopy, Coords, DifCoords, CoordsNewD, DifCoordsNewD, LsCopy, m_model_newD.getVertices(), verticesCount, ratios[i]);
+			Task3Sub(Qcopy, Coords, DifCoords, CoordsNewD, DifCoordsNewD, m_model_newD.getVertices(), verticesCount, ratios[i], LCopy);
 	}
+	//*/
+	const string coordsDir = getBasePath() + "resources/coords/";
+	const string coordsFile = coordsDir + FILENAME + ".txt";
+	SaveCoordsToFile(coordsFile, CoordsNewA, DifCoordsNewA, CoordsNewB, DifCoordsNewB, CoordsNewC, DifCoordsNewC, CoordsNewD, DifCoordsNewD);
+	//ReadCoordsFromFile(coordsFile, CoordsNewA, DifCoordsNewA, CoordsNewB, DifCoordsNewB, CoordsNewC, DifCoordsNewC, CoordsNewD, DifCoordsNewD, verticesCount);
 }
 
-void Mesh3DScene::Task3Sub(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, MatrixXd& CoordsNew, MatrixXd& DifCoordsNew, MatrixXd& Ls, vector<vec>& m_vertices_new, int verticesCount, double ratio) {
-	/*
+void Mesh3DScene::Task3Sub(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, MatrixXd& CoordsNew, MatrixXd& DifCoordsNew, vector<vec>& m_vertices_new, int verticesCount, double ratio, SparseMatrix<double>& L) {
+	//*
 	MatrixXd Xtilda = Q.transpose() * Coords;
-	for (int i = RATIO * verticesCount; i < verticesCount; i++) {
+	for (int i = ratio * verticesCount; i < verticesCount; i++) {
 		for (int j = 0; j < verticesCount; j++) {
 			Q(j, i) = 0;
 		}
@@ -229,30 +234,20 @@ void Mesh3DScene::Task3Sub(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, M
 		}
 	}
 	//*/
-	//*
-	MatrixXd Deltatilda = Q.transpose() * DifCoords;
-	for (int i = ratio * verticesCount; i < verticesCount; i++) {
-		for (int j = 0; j < verticesCount; j++) {
-			Q(j, i) = 0;
-		}
-		for (int j = 0; j < 3; j++) {
-			Deltatilda(i, j) = 0;
-		}
-	}
-	DifCoordsNew = Q * Deltatilda;
-	//*/
+	DifCoordsNew = L * (Q * Xtilda);
 
 	cout << "rank calculation begins" << endl;
 	int rank;
 	int dimCount = verticesCount;
+	SparseQR <SparseMatrix<double>, COLAMDOrdering<int>> col_decomp;
 	while (true) {
 		dimCount++;
 		int count = dimCount - verticesCount - 1;
-		Ls.conservativeResize(dimCount, NoChange);
+		L.conservativeResize(dimCount, verticesCount);//NoChange);
 		for (int i = 0; i < verticesCount; i++) {
-			Ls(dimCount - 1, i) = 0;
+			//LSparse.coeffRef(dimCount - 1, i) = 0;
 		}
-		Ls(dimCount - 1, count) = 1;
+		L.coeffRef(dimCount - 1, count) = 1;
 
 		DifCoordsNew.conservativeResize(dimCount, NoChange);
 		for (int i = 0; i < 3; i++) {
@@ -260,7 +255,10 @@ void Mesh3DScene::Task3Sub(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, M
 		}
 
 		//*
-		ColPivHouseholderQR<MatrixXd> col_decomp(Ls);
+		//ColPivHouseholderQR<MatrixXd> col_decomp(L);
+		if (!L.isCompressed())
+			L.makeCompressed();
+		col_decomp.compute(L);
 		rank = col_decomp.rank();
 		cout << "rank = " << rank << endl;
 		if (rank >= verticesCount) {
@@ -268,26 +266,15 @@ void Mesh3DScene::Task3Sub(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, M
 			break;
 		}
 		//*/
-		/*
-		if (count >= 1) {
-			//ColPivHouseholderQR<MatrixXd> col_decomp(Ls);
-			//rank = col_decomp.rank();
-			//cout << "rank = " << rank << endl;
-			break;
-		}
-		//*/
 	}
 
 	cout << "new Dif Coords ready" << endl;
-	//CoordsNew = ((Ls.transpose() * Ls).inverse()) * Ls.transpose() * DifCoordsNew;
-	CoordsNew = Ls.colPivHouseholderQr().solve(DifCoordsNew);
-	//CoordsNew = Q * Xtilda;
-
-	for (int i = 0; i < verticesCount; i++) {
-		m_vertices_new[i].x = CoordsNew(i, 0);
-		m_vertices_new[i].y = CoordsNew(i, 1);
-		m_vertices_new[i].z = CoordsNew(i, 2);
-	}
+	//CoordsNew = ((L.transpose() * L).inverse()) * L.transpose() * DifCoordsNew;
+	//CoordsNew = L.colPivHouseholderQr().solve(DifCoordsNew);
+	CoordsNew = col_decomp.solve(DifCoordsNew);
+	cout << "new Coords ready" << endl;
+	
+	CoordsToModel(m_vertices_new, CoordsNew, verticesCount);
 }
 
 void Mesh3DScene::Task4(const MatrixXd& Coords, const MatrixXd& CoordsNewA, const MatrixXd& CoordsNewB, const MatrixXd& CoordsNewC, const MatrixXd& CoordsNewD, const MatrixXd& DifCoords, const MatrixXd& DifCoordsNewA, const MatrixXd& DifCoordsNewB, const MatrixXd& DifCoordsNewC, const MatrixXd& DifCoordsNewD, const Eigen::MatrixXd& L) {
@@ -296,6 +283,7 @@ void Mesh3DScene::Task4(const MatrixXd& Coords, const MatrixXd& CoordsNewA, cons
 	Task4Sub(m_triangles, m_model_newB.getVertices(), m_points_coords3DB, m_triangles_coords3DB, m_points_difCoords3DB, m_triangles_difCoords3DB, Coords, CoordsNewB, DifCoords, DifCoordsNewB, L);
 	Task4Sub(m_triangles, m_model_newC.getVertices(), m_points_coords3DC, m_triangles_coords3DC, m_points_difCoords3DC, m_triangles_difCoords3DC, Coords, CoordsNewC, DifCoords, DifCoordsNewC, L);
 	Task4Sub(m_triangles, m_model_newD.getVertices(), m_points_coords3DD, m_triangles_coords3DD, m_points_difCoords3DD, m_triangles_difCoords3DD, Coords, CoordsNewD, DifCoords, DifCoordsNewD, L);
+	
 }
 
 void Mesh3DScene::Task4Sub(vector<vvr::Triangle>& m_triangles, vector<vec>& m_vertices_new, vector<Point3D>& m_points_coords3D, vector<Triangle3D>& m_triangles_coords3D, vector<Point3D>& m_points_difCoords3D, vector<Triangle3D>& m_triangles_difCoords3D, const MatrixXd& Coords, const MatrixXd& CoordsNew, const MatrixXd& DifCoords, const MatrixXd& DifCoordsNew, const Eigen::MatrixXd& L) {
@@ -330,11 +318,9 @@ void Mesh3DScene::Task4Sub(vector<vvr::Triangle>& m_triangles, vector<vec>& m_ve
 	double totalMistake = 0;
 	for (int i = 0; i < verticesCount; i++) {
 		vec diff = vec(DifCoordsNewNew(i, 0) - DifCoordsNew(i, 0), DifCoordsNewNew(i, 1) - DifCoordsNew(i, 1), DifCoordsNewNew(i, 2) - DifCoordsNew(i, 2));
-		//cout << diff.Length() << endl;
 		totalMistake += diff.Length();
 	}
 	cout << "total mistake = " << totalMistake << endl;
-	//*
 	VectorXd DifInDifCoords(verticesCount);
 	double maxDifInDifCoords = 0;
 	for (int i = 0; i < verticesCount; i++) {
@@ -350,7 +336,6 @@ void Mesh3DScene::Task4Sub(vector<vvr::Triangle>& m_triangles, vector<vec>& m_ve
 		cout << DifInDifCoords(i) << endl;
 	}
 	//*/
-	//
 	for (int i = 0; i < verticesCount; i++) {
 		m_points_difCoords3D.push_back(Point3D(m_vertices_new[i].x, m_vertices_new[i].y, m_vertices_new[i].z, vvr::Colour((DifInDifCoords(i) / maxDifInDifCoords) * 255, 0, (1 - (DifInDifCoords(i) / maxDifInDifCoords)) * 255)));
 	}
@@ -362,7 +347,6 @@ void Mesh3DScene::Task4Sub(vector<vvr::Triangle>& m_triangles, vector<vec>& m_ve
 			vvr::Colour((DifInDifCoords(m_triangles[i].vi2) / maxDifInDifCoords) * 255, 0, (1 - (DifInDifCoords(m_triangles[i].vi2) / maxDifInDifCoords)) * 255),
 			vvr::Colour((DifInDifCoords(m_triangles[i].vi3) / maxDifInDifCoords) * 255, 0, (1 - (DifInDifCoords(m_triangles[i].vi3) / maxDifInDifCoords)) * 255));
 	}
-	//*/
 }
 
 void Mesh3DScene::GetDifCoordsInNormalDirection(vector<vvr::Triangle>& m_triangles, vector<vec>& m_vertices, MatrixXd& DifCoords, MatrixXd& newDifCoords){
@@ -429,6 +413,91 @@ void Mesh3DScene::ReadEigenFromFile(const string eigenFile, VectorXd& eigenValue
 		}
 	}
 	myfile.close();
+}
+
+void Mesh3DScene::SaveCoordsToFile(const string coordsFile, Eigen::MatrixXd& CoordsNewA, Eigen::MatrixXd& DifCoordsNewA, Eigen::MatrixXd& CoordsNewB, Eigen::MatrixXd& DifCoordsNewB, Eigen::MatrixXd& CoordsNewC, Eigen::MatrixXd& DifCoordsNewC, Eigen::MatrixXd& CoordsNewD, Eigen::MatrixXd& DifCoordsNewD) {
+	ofstream myfile;
+	myfile.open(coordsFile);
+	myfile << CoordsNewA << "\n\n";
+	myfile << DifCoordsNewA.rows() << "\n";
+	myfile << DifCoordsNewA << "\n\n";
+	myfile << CoordsNewB << "\n\n";
+	myfile << DifCoordsNewB.rows() << "\n";
+	myfile << DifCoordsNewB << "\n\n";
+	myfile << CoordsNewC << "\n\n";
+	myfile << DifCoordsNewC.rows() << "\n";
+	myfile << DifCoordsNewC << "\n\n";
+	myfile << CoordsNewD << "\n\n";
+	myfile << DifCoordsNewD.rows() << "\n";
+	myfile << DifCoordsNewD << "\n\n";
+	myfile.close();
+}
+
+void Mesh3DScene::ReadCoordsFromFile(const string coordsFile, Eigen::MatrixXd& CoordsNewA, Eigen::MatrixXd& DifCoordsNewA, Eigen::MatrixXd& CoordsNewB, Eigen::MatrixXd& DifCoordsNewB, Eigen::MatrixXd& CoordsNewC, Eigen::MatrixXd& DifCoordsNewC, Eigen::MatrixXd& CoordsNewD, Eigen::MatrixXd& DifCoordsNewD, int verticesCount) {
+	int count;
+	ifstream myfile;
+	myfile.open(coordsFile);
+	for (int i = 0; i < verticesCount; i++) {
+		for (int j = 0; j < 3; j++) {
+			myfile >> CoordsNewA(i, j);
+		}
+	}
+	myfile >> count;
+	DifCoordsNewA.conservativeResize(count, NoChange);
+	for (int i = 0; i < count; i++) {
+		for (int j = 0; j < 3; j++) {
+			myfile >> DifCoordsNewA(i, j);
+		}
+	}
+	for (int i = 0; i < verticesCount; i++) {
+		for (int j = 0; j < 3; j++) {
+			myfile >> CoordsNewB(i, j);
+		}
+	}
+	myfile >> count;
+	DifCoordsNewB.conservativeResize(count, NoChange);
+	for (int i = 0; i < count; i++) {
+		for (int j = 0; j < 3; j++) {
+			myfile >> DifCoordsNewB(i, j);
+		}
+	}
+	for (int i = 0; i < verticesCount; i++) {
+		for (int j = 0; j < 3; j++) {
+			myfile >> CoordsNewC(i, j);
+		}
+	}
+	myfile >> count;
+	DifCoordsNewC.conservativeResize(count, NoChange);
+	for (int i = 0; i < count; i++) {
+		for (int j = 0; j < 3; j++) {
+			myfile >> DifCoordsNewC(i, j);
+		}
+	}
+	for (int i = 0; i < verticesCount; i++) {
+		for (int j = 0; j < 3; j++) {
+			myfile >> CoordsNewD(i, j);
+		}
+	}
+	myfile >> count;
+	DifCoordsNewD.conservativeResize(count, NoChange);
+	for (int i = 0; i < count; i++) {
+		for (int j = 0; j < 3; j++) {
+			myfile >> DifCoordsNewD(i, j);
+		}
+	}
+	myfile.close();
+	CoordsToModel(m_model_newA.getVertices(), CoordsNewA, verticesCount);
+	CoordsToModel(m_model_newB.getVertices(), CoordsNewB, verticesCount);
+	CoordsToModel(m_model_newC.getVertices(), CoordsNewC, verticesCount);
+	CoordsToModel(m_model_newD.getVertices(), CoordsNewD, verticesCount);
+}
+
+void Mesh3DScene::CoordsToModel(std::vector<vec>& m_vertices_new, Eigen::MatrixXd& CoordsNew, int verticesCount) {
+	for (int i = 0; i < verticesCount; i++) {
+		m_vertices_new[i].x = CoordsNew(i, 0);
+		m_vertices_new[i].y = CoordsNew(i, 1);
+		m_vertices_new[i].z = CoordsNew(i, 2);
+	}
 }
 
 void Mesh3DScene::arrowEvent(ArrowDir dir, int modif)
@@ -505,7 +574,6 @@ void Mesh3DScene::keyEvent(unsigned char key, bool up, int modif)
 void Mesh3DScene::draw()
 {
 	if (m_style_flag & FLAG_SHOW_ORIGINAL_MODEL) {
-		//cout << "in" << endl;
 		if (m_style_flag & FLAG_SHOW_SOLID) m_model.draw(m_obj_col, SOLID);
 		if (m_style_flag & FLAG_SHOW_WIRE) m_model.draw(Colour::black, WIRE);
 		if (m_style_flag & FLAG_SHOW_NORMALS) m_model.draw(Colour::black, NORMALS);
@@ -550,132 +618,9 @@ void Mesh3DScene::draw()
 				}
 			}
 		}
-		/*
-		if (ratio_flag == 0) {
-			if (m_style_flag & FLAG_SHOW_SOLID) m_model_newA.draw(m_obj_col, SOLID);
-			if (m_style_flag & FLAG_SHOW_WIRE) m_model_newA.draw(Colour::black, WIRE);
-			if (m_style_flag & FLAG_SHOW_NORMALS) m_model_newA.draw(Colour::black, NORMALS);
-			if (m_style_flag & FLAG_SHOW_AXES) m_model_newA.draw(Colour::black, AXES);
-			if (m_style_flag & FLAG_SHOW_DIFCOORDS) {
-				if (m_style_flag & FLAG_SHOW_POINTS) {
-					for (int i = 0; i < m_points_difCoords3DA.size(); i++) {
-						m_points_difCoords3DA[i].draw();
-					}
-				}
-				if (m_style_flag & FLAG_SHOW_TRIANGLES) {
-					for (int i = 0; i < m_triangles_difCoords3DA.size(); i++) {
-						m_triangles_difCoords3DA[i].draw();
-					}
-				}
-			}
-			else {
-				if (m_style_flag & FLAG_SHOW_POINTS) {
-					for (int i = 0; i < m_points_coords3DA.size(); i++) {
-						m_points_coords3DA[i].draw();
-					}
-				}
-				if (m_style_flag & FLAG_SHOW_TRIANGLES) {
-					for (int i = 0; i < m_triangles_coords3DA.size(); i++) {
-						m_triangles_coords3DA[i].draw();
-					}
-				}
-			}
-		}
-		else if (ratio_flag == 1) {
-			if (m_style_flag & FLAG_SHOW_SOLID) m_model_newB.draw(m_obj_col, SOLID);
-			if (m_style_flag & FLAG_SHOW_WIRE) m_model_newB.draw(Colour::black, WIRE);
-			if (m_style_flag & FLAG_SHOW_NORMALS) m_model_newB.draw(Colour::black, NORMALS);
-			if (m_style_flag & FLAG_SHOW_AXES) m_model_newB.draw(Colour::black, AXES);
-			if (m_style_flag & FLAG_SHOW_DIFCOORDS) {
-				if (m_style_flag & FLAG_SHOW_POINTS) {
-					for (int i = 0; i < m_points_difCoords3DB.size(); i++) {
-						m_points_difCoords3DB[i].draw();
-					}
-				}
-				if (m_style_flag & FLAG_SHOW_TRIANGLES) {
-					for (int i = 0; i < m_triangles_difCoords3DB.size(); i++) {
-						m_triangles_difCoords3DB[i].draw();
-					}
-				}
-			}
-			else {
-				if (m_style_flag & FLAG_SHOW_POINTS) {
-					for (int i = 0; i < m_points_coords3DB.size(); i++) {
-						m_points_coords3DB[i].draw();
-					}
-				}
-				if (m_style_flag & FLAG_SHOW_TRIANGLES) {
-					for (int i = 0; i < m_triangles_coords3DB.size(); i++) {
-						m_triangles_coords3DB[i].draw();
-					}
-				}
-			}
-		}
-		else if (ratio_flag == 2) {
-			if (m_style_flag & FLAG_SHOW_SOLID) m_model_newC.draw(m_obj_col, SOLID);
-			if (m_style_flag & FLAG_SHOW_WIRE) m_model_newC.draw(Colour::black, WIRE);
-			if (m_style_flag & FLAG_SHOW_NORMALS) m_model_newC.draw(Colour::black, NORMALS);
-			if (m_style_flag & FLAG_SHOW_AXES) m_model_newC.draw(Colour::black, AXES);
-			if (m_style_flag & FLAG_SHOW_DIFCOORDS) {
-				if (m_style_flag & FLAG_SHOW_POINTS) {
-					for (int i = 0; i < m_points_difCoords3DC.size(); i++) {
-						m_points_difCoords3DC[i].draw();
-					}
-				}
-				if (m_style_flag & FLAG_SHOW_TRIANGLES) {
-					for (int i = 0; i < m_triangles_difCoords3DC.size(); i++) {
-						m_triangles_difCoords3DC[i].draw();
-					}
-				}
-			}
-			else {
-				if (m_style_flag & FLAG_SHOW_POINTS) {
-					for (int i = 0; i < m_points_coords3DC.size(); i++) {
-						m_points_coords3DC[i].draw();
-					}
-				}
-				if (m_style_flag & FLAG_SHOW_TRIANGLES) {
-					for (int i = 0; i < m_triangles_coords3DC.size(); i++) {
-						m_triangles_coords3DC[i].draw();
-					}
-				}
-			}
-		}
-		else if (ratio_flag == 3) {
-			if (m_style_flag & FLAG_SHOW_SOLID) m_model_newD.draw(m_obj_col, SOLID);
-			if (m_style_flag & FLAG_SHOW_WIRE) m_model_newD.draw(Colour::black, WIRE);
-			if (m_style_flag & FLAG_SHOW_NORMALS) m_model_newD.draw(Colour::black, NORMALS);
-			if (m_style_flag & FLAG_SHOW_AXES) m_model_newD.draw(Colour::black, AXES);
-			if (m_style_flag & FLAG_SHOW_DIFCOORDS) {
-				if (m_style_flag & FLAG_SHOW_POINTS) {
-					for (int i = 0; i < m_points_difCoords3DD.size(); i++) {
-						m_points_difCoords3DD[i].draw();
-					}
-				}
-				if (m_style_flag & FLAG_SHOW_TRIANGLES) {
-					for (int i = 0; i < m_triangles_difCoords3DD.size(); i++) {
-						m_triangles_difCoords3DD[i].draw();
-					}
-				}
-			}
-			else {
-				if (m_style_flag & FLAG_SHOW_POINTS) {
-					for (int i = 0; i < m_points_coords3DD.size(); i++) {
-						m_points_coords3DD[i].draw();
-					}
-				}
-				if (m_style_flag & FLAG_SHOW_TRIANGLES) {
-					for (int i = 0; i < m_triangles_coords3DD.size(); i++) {
-						m_triangles_coords3DD[i].draw();
-					}
-				}
-			}
-		}
-		//*/
 	}
 }
  
-
 int main(int argc, char* argv[])
 {
 	try {
