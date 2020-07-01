@@ -1,7 +1,11 @@
 #include "SceneMesh3D.h"
 #include "ctime"
 
-#define FILENAME "phone_v02"
+#define FILENAME "unicorn_low_low"
+#define CONTROL_POINTS 1
+#define SAMPLE_POINTS 150
+#define SECTION_SIZE 0.5
+#define NUM_OF_FILES 21
 
 using namespace std;
 using namespace vvr;
@@ -98,7 +102,7 @@ void Mesh3DScene::Tasks()
 		cout << endl;
 	}
 	//*/
-	Task2(Ls, eigenValues, eigenVectors, verticesCount);
+	//Task2(Ls, eigenValues, eigenVectors, verticesCount);
 	/*
 	for (int i = 0; i < verticesCount; i++) {
 		cout << eigenValues(i) << endl;
@@ -110,6 +114,7 @@ void Mesh3DScene::Tasks()
 		cout << endl;
 	}
 	//*/
+	/*
 	MatrixXd Q = eigenVectors;
 	MatrixXd CoordsNewA(verticesCount, 3);
 	MatrixXd DifCoordsNewA(verticesCount, 3);
@@ -120,9 +125,12 @@ void Mesh3DScene::Tasks()
 	MatrixXd CoordsNewD(verticesCount, 3);
 	MatrixXd DifCoordsNewD(verticesCount, 3);
 	MatrixXd LDense = L;
-	Task3(Q, Coords, DifCoords, CoordsNewA, DifCoordsNewA, CoordsNewB, DifCoordsNewB, CoordsNewC, DifCoordsNewC, CoordsNewD, DifCoordsNewD, verticesCount, L);
+	//*/
+	//Task3(Q, Coords, DifCoords, CoordsNewA, DifCoordsNewA, CoordsNewB, DifCoordsNewB, CoordsNewC, DifCoordsNewC, CoordsNewD, DifCoordsNewD, verticesCount, L);
 	cout << "new Coords ready" << endl;
-	Task4(Coords, CoordsNewA, CoordsNewB, CoordsNewC, CoordsNewD, DifCoords, DifCoordsNewA, DifCoordsNewB, DifCoordsNewC, DifCoordsNewD, LDense);
+	//Task4(Coords, CoordsNewA, CoordsNewB, CoordsNewC, CoordsNewD, DifCoords, DifCoordsNewA, DifCoordsNewB, DifCoordsNewC, DifCoordsNewD, LDense);
+	cout << "Task 4 done" << endl;
+	Task5B();
 	cout << "done!!!" << endl;
 }
 
@@ -218,7 +226,7 @@ void Mesh3DScene::Task3(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, Matr
 	//*/
 	const string coordsDir = getBasePath() + "resources/coords/";
 	const string coordsFile = coordsDir + FILENAME + ".txt";
-	SaveCoordsToFile(coordsFile, CoordsNewA, DifCoordsNewA, CoordsNewB, DifCoordsNewB, CoordsNewC, DifCoordsNewC, CoordsNewD, DifCoordsNewD);
+	//SaveCoordsToFile(coordsFile, CoordsNewA, DifCoordsNewA, CoordsNewB, DifCoordsNewB, CoordsNewC, DifCoordsNewC, CoordsNewD, DifCoordsNewD);
 	//ReadCoordsFromFile(coordsFile, CoordsNewA, DifCoordsNewA, CoordsNewB, DifCoordsNewB, CoordsNewC, DifCoordsNewC, CoordsNewD, DifCoordsNewD, verticesCount);
 }
 
@@ -226,9 +234,6 @@ void Mesh3DScene::Task3Sub(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, M
 	//*
 	MatrixXd Xtilda = Q.transpose() * Coords;
 	for (int i = ratio * verticesCount; i < verticesCount; i++) {
-		for (int j = 0; j < verticesCount; j++) {
-			Q(j, i) = 0;
-		}
 		for (int j = 0; j < 3; j++) {
 			Xtilda(i, j) = 0;
 		}
@@ -236,30 +241,44 @@ void Mesh3DScene::Task3Sub(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, M
 	//*/
 	DifCoordsNew = L * (Q * Xtilda);
 
+	int* options = new int[verticesCount];
+	for (int i = 0; i < verticesCount; i++) {
+		options[i] = i;
+	}
+	shuffle_arr(options, verticesCount);
+
 	cout << "rank calculation begins" << endl;
 	int rank;
 	int dimCount = verticesCount;
-	SparseQR <SparseMatrix<double>, COLAMDOrdering<int>> col_decomp;
+	//SparseQR <SparseMatrix<double>, COLAMDOrdering<int>> col_decomp;
+	SimplicialLLT<SparseMatrix<double>> llt;
 	while (true) {
 		dimCount++;
 		int count = dimCount - verticesCount - 1;
 		L.conservativeResize(dimCount, verticesCount);//NoChange);
-		for (int i = 0; i < verticesCount; i++) {
-			//LSparse.coeffRef(dimCount - 1, i) = 0;
-		}
-		L.coeffRef(dimCount - 1, count) = 1;
+		L.coeffRef(dimCount - 1, options[count]) = 1;
 
 		DifCoordsNew.conservativeResize(dimCount, NoChange);
 		for (int i = 0; i < 3; i++) {
-			DifCoordsNew(dimCount - 1, i) = Coords(count, i);
+			DifCoordsNew(dimCount - 1, i) = Coords(options[count], i);
 		}
 
 		//*
-		//ColPivHouseholderQR<MatrixXd> col_decomp(L);
 		if (!L.isCompressed())
 			L.makeCompressed();
-		col_decomp.compute(L);
-		rank = col_decomp.rank();
+		llt.compute(L.transpose() * L);
+		double det = llt.determinant();
+		//col_decomp.compute(L);
+		//rank = col_decomp.rank();
+
+
+		//*
+		if (abs(det) > 0 && count >= CONTROL_POINTS - 1) {
+			cout << "det = " << det << endl;
+			break;
+		}
+		//*/
+		/*
 		cout << "rank = " << rank << endl;
 		if (rank >= verticesCount) {
 			cout << "hehehe" << count << endl;
@@ -270,14 +289,14 @@ void Mesh3DScene::Task3Sub(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, M
 
 	cout << "new Dif Coords ready" << endl;
 	//CoordsNew = ((L.transpose() * L).inverse()) * L.transpose() * DifCoordsNew;
-	//CoordsNew = L.colPivHouseholderQr().solve(DifCoordsNew);
-	CoordsNew = col_decomp.solve(DifCoordsNew);
+	//CoordsNew = col_decomp.solve(DifCoordsNew);
+	CoordsNew = llt.solve(L.transpose() * DifCoordsNew);
 	cout << "new Coords ready" << endl;
 	
 	CoordsToModel(m_vertices_new, CoordsNew, verticesCount);
 }
 
-void Mesh3DScene::Task4(const MatrixXd& Coords, const MatrixXd& CoordsNewA, const MatrixXd& CoordsNewB, const MatrixXd& CoordsNewC, const MatrixXd& CoordsNewD, const MatrixXd& DifCoords, const MatrixXd& DifCoordsNewA, const MatrixXd& DifCoordsNewB, const MatrixXd& DifCoordsNewC, const MatrixXd& DifCoordsNewD, const Eigen::MatrixXd& L) {
+void Mesh3DScene::Task4(const MatrixXd& Coords, const MatrixXd& CoordsNewA, const MatrixXd& CoordsNewB, const MatrixXd& CoordsNewC, const MatrixXd& CoordsNewD, const MatrixXd& DifCoords, const MatrixXd& DifCoordsNewA, const MatrixXd& DifCoordsNewB, const MatrixXd& DifCoordsNewC, const MatrixXd& DifCoordsNewD, const MatrixXd& L) {
 	vector<vvr::Triangle>& m_triangles = m_model.getTriangles();
 	Task4Sub(m_triangles, m_model_newA.getVertices(), m_points_coords3DA, m_triangles_coords3DA, m_points_difCoords3DA, m_triangles_difCoords3DA, Coords, CoordsNewA, DifCoords, DifCoordsNewA, L);
 	Task4Sub(m_triangles, m_model_newB.getVertices(), m_points_coords3DB, m_triangles_coords3DB, m_points_difCoords3DB, m_triangles_difCoords3DB, Coords, CoordsNewB, DifCoords, DifCoordsNewB, L);
@@ -286,7 +305,7 @@ void Mesh3DScene::Task4(const MatrixXd& Coords, const MatrixXd& CoordsNewA, cons
 	
 }
 
-void Mesh3DScene::Task4Sub(vector<vvr::Triangle>& m_triangles, vector<vec>& m_vertices_new, vector<Point3D>& m_points_coords3D, vector<Triangle3D>& m_triangles_coords3D, vector<Point3D>& m_points_difCoords3D, vector<Triangle3D>& m_triangles_difCoords3D, const MatrixXd& Coords, const MatrixXd& CoordsNew, const MatrixXd& DifCoords, const MatrixXd& DifCoordsNew, const Eigen::MatrixXd& L) {
+void Mesh3DScene::Task4Sub(vector<vvr::Triangle>& m_triangles, vector<vec>& m_vertices_new, vector<Point3D>& m_points_coords3D, vector<Triangle3D>& m_triangles_coords3D, vector<Point3D>& m_points_difCoords3D, vector<Triangle3D>& m_triangles_difCoords3D, const MatrixXd& Coords, const MatrixXd& CoordsNew, const MatrixXd& DifCoords, const MatrixXd& DifCoordsNew, const MatrixXd& L) {
 	int verticesCount = m_vertices_new.size();
 	int trianglesCount = m_triangles.size();
 	
@@ -349,6 +368,200 @@ void Mesh3DScene::Task4Sub(vector<vvr::Triangle>& m_triangles, vector<vec>& m_ve
 	}
 }
 
+//*/
+void Mesh3DScene::Task5A() {
+	const string eigenDir = getBasePath() + "resources/eigen/";
+	string files[NUM_OF_FILES] = { "armadillo_low_low", "b66_L2", "bone", "bunny_low", "cube", "dolphin", "dragon_low_low",
+		"flashlight", "flashlightNoCentered", "hand2", "icosahedron", "phone_v02", "polyhedron",
+		"suzanne", "teapotMultiMesh", "unicorn_low", "unicorn_low_low", "vvrlab" };
+	int verticesCount[NUM_OF_FILES];
+	VectorXd eigenValues[NUM_OF_FILES];
+	double maxEigenValue = 0;
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		string eigenFile = eigenDir + files[i] + ".txt";
+		ifstream myfile;
+		myfile.open(eigenFile);
+		myfile >> verticesCount[i];
+		eigenValues[i] = VectorXd(verticesCount[i]);
+		for (int j = 0; j < verticesCount[i]; j++) {
+			myfile >> eigenValues[i](j);
+		}
+		myfile.close();
+		if (eigenValues[i](verticesCount[i] - 1) > maxEigenValue)
+			maxEigenValue = eigenValues[i](verticesCount[i] - 1);
+	}
+	
+	int sectionCount = ceil(maxEigenValue / SECTION_SIZE);
+	float** eigenSections = new float* [NUM_OF_FILES];
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		eigenSections[i] = new float[sectionCount];
+		for (int j = 0; j < sectionCount; j++) {
+			eigenSections[i][j] = 0;
+		}
+	}
+	double maxSection[NUM_OF_FILES];
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		maxSection[i] = 0;
+	}
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		for (int j = 0; j < verticesCount[i]; j++) {
+			int section = ceil(eigenValues[i](j) / SECTION_SIZE);
+			eigenSections[i][section] ++;
+		}
+		for (int j = 0; j < sectionCount; j++) {
+			if (eigenSections[i][j] > maxSection[i])
+				maxSection[i] = eigenSections[i][j];
+		}
+		for (int j = 0; j < sectionCount; j++) {
+			eigenSections[i][j] /= maxSection[i];          //verticesCount[i];    //maxSection[i];
+		}
+	}
+	for (int i = 0; i < sectionCount; i++) {
+		//cout << eigenSections[15][i] << "   "<< eigenSections[16][i] <<endl;
+	}
+	double errors[NUM_OF_FILES];
+	int myIndex;
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		errors[i] = 0;
+		if (files[i] == FILENAME)
+			myIndex = i;
+	}
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		for (int j = 0; j < sectionCount; j++) {
+			errors[i] += (eigenSections[myIndex][j] - eigenSections[i][j]) * (eigenSections[myIndex][j] - eigenSections[i][j]);
+		}
+	}
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		cout << errors[i] << endl;
+	}
+	for (int i = 0; i < NUM_OF_FILES - 1; i++) {
+		for (int j = 0; j < NUM_OF_FILES - 1 - i; j++) {
+			if (errors[j] > errors[j + 1]) {
+				double temp = errors[j];
+				errors[j] = errors[j + 1];
+				errors[j + 1] = temp;
+				string tempfile = files[j];
+				files[j] = files[j + 1];
+				files[j + 1] = tempfile;
+			}
+		}
+	}
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		cout << files[i] << endl;
+	}
+
+
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		delete[] eigenSections[i];
+	}
+	delete[] eigenSections;
+}
+//*/
+
+void Mesh3DScene::Task5B() {
+	const string objDir = getBasePath() + "resources/obj/";
+	string files[NUM_OF_FILES] = { "armadillo_low_low", "b66_L2", "bone", "bunny_low", "cube", "dolphin", "dragon_low_low",
+		"flashlight", "flashlightNoCentered", "hand2", "icosahedron", "phone_v02", "polyhedron",
+		"suzanne", "teapotMultiMesh", "unicorn_low", "unicorn_low_low", "vvrlab", "pins", "insect1", "insect2" };
+	double*** distances = new double** [NUM_OF_FILES];
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		distances[i] = new double* [SAMPLE_POINTS];
+		for (int j = 0; j < SAMPLE_POINTS; j++) {
+			distances[i][j] = new double[SAMPLE_POINTS];
+		}
+	}
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		string objFile = objDir + files[i] + ".obj";
+		m_model_other = Mesh(objFile);
+		vector<vec>& vertices = m_model_other.getVertices();
+		vec* verticesSelected = new vec[SAMPLE_POINTS];
+		verticesSelected[0] = vertices[rand() % vertices.size()];
+		for (int j = 1; j < SAMPLE_POINTS; j++) {
+			double biggestScore = -1;
+			int biggestIndex = -1;
+			for (int k = 0; k < vertices.size(); k++) {
+				double minDist = 1e5;
+				for (int l = 0; l < j; l++) {
+					if (dist(vertices[k], verticesSelected[l]) < minDist)
+						minDist = dist(vertices[k], verticesSelected[l]);
+				}
+				if (minDist > biggestScore) {
+					biggestScore = minDist;
+					biggestIndex = k;
+				}
+			}
+			verticesSelected[j] = vertices[biggestIndex];
+		}
+		double maxDist = 0;
+		for (int j = 0; j < SAMPLE_POINTS; j++) {
+			distances[i][j][j] = 0;
+			for (int k = j + 1; k < SAMPLE_POINTS; k++) {
+				distances[i][j][k] = dist(verticesSelected[j], verticesSelected[k]);
+				distances[i][k][j] = distances[i][j][k];
+				if (distances[i][j][k] > maxDist)
+					maxDist = distances[i][j][k];
+			}
+		}
+		for (int j = 0; j < SAMPLE_POINTS; j++) {
+			for (int k = 0; k < SAMPLE_POINTS; k++) {
+				distances[i][j][k] = exp(-distances[i][j][k] * distances[i][j][k] / (2 * maxDist * maxDist));
+			}
+		}
+		delete[] verticesSelected;
+	}
+
+	VectorXd eigenValues[NUM_OF_FILES];
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		MatrixXd A(SAMPLE_POINTS, SAMPLE_POINTS);
+		for (int j = 0; j < SAMPLE_POINTS; j++) {
+			for (int k = 0; k < SAMPLE_POINTS; k++) {
+				A(j, k) = distances[i][j][k];
+			}
+		}
+		SelfAdjointEigenSolver<MatrixXd> solver;
+		solver.compute(A);
+		eigenValues[i] = solver.eigenvalues().real();
+		for (int j = 0; j < SAMPLE_POINTS; j++) {
+			if (eigenValues[i](j) < 0)
+				eigenValues[i](j) = -eigenValues[i](j);
+		}
+	}
+	double errors[NUM_OF_FILES];
+	int myIndex;
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		if (files[i] == FILENAME)
+			myIndex = i;
+	}
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		errors[i] = CalculateError(eigenValues[myIndex], eigenValues[i]);
+	}
+	for (int i = 0; i < NUM_OF_FILES - 1; i++) {
+		for (int j = 0; j < NUM_OF_FILES - 1 - i; j++) {
+			if (errors[j] > errors[j + 1]) {
+				double temp = errors[j];
+				errors[j] = errors[j + 1];
+				errors[j + 1] = temp;
+				string tempfile = files[j];
+				files[j] = files[j + 1];
+				files[j + 1] = tempfile;
+			}
+		}
+	}
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		cout << files[i] << "  " << errors[i] << endl;
+	}
+	
+	/*/
+	for (int i = 0; i < NUM_OF_FILES; i++) {
+		for (int j = 0; i < SAMPLE_POINTS; i++) {
+			delete[] distances[i][j];
+		}
+		delete[] distances[i];
+	}
+	delete[] distances;
+	//*/
+}
+
 void Mesh3DScene::GetDifCoordsInNormalDirection(vector<vvr::Triangle>& m_triangles, vector<vec>& m_vertices, MatrixXd& DifCoords, MatrixXd& newDifCoords){
 	int verticesCount = m_vertices.size();
 	int trianglesCount = m_triangles.size();
@@ -379,15 +592,6 @@ void Mesh3DScene::ComputeEigenDecomposition(MatrixXd& Ls, VectorXd& eigenValues,
 	solver.compute(Ls); 
 	eigenValues = solver.eigenvalues().real();
 	eigenVectors = solver.eigenvectors().real();
-	/*
-	for (int i = 0; i < verticesCount; i++) {
-		for (int j = 0; j < verticesCount; j++) {
-			if (eigenVectors(i, j) < 1.0e-9) {
-				eigenVectors(i, j) = 0;
-			}
-		}
-	}
-	//*/
 }
 
 void Mesh3DScene::SaveEigenToFile(const string eigenFile, VectorXd& eigenValues, MatrixXd& eigenVectors, int verticesCount) {
@@ -415,7 +619,7 @@ void Mesh3DScene::ReadEigenFromFile(const string eigenFile, VectorXd& eigenValue
 	myfile.close();
 }
 
-void Mesh3DScene::SaveCoordsToFile(const string coordsFile, Eigen::MatrixXd& CoordsNewA, Eigen::MatrixXd& DifCoordsNewA, Eigen::MatrixXd& CoordsNewB, Eigen::MatrixXd& DifCoordsNewB, Eigen::MatrixXd& CoordsNewC, Eigen::MatrixXd& DifCoordsNewC, Eigen::MatrixXd& CoordsNewD, Eigen::MatrixXd& DifCoordsNewD) {
+void Mesh3DScene::SaveCoordsToFile(const string coordsFile, MatrixXd& CoordsNewA, MatrixXd& DifCoordsNewA, MatrixXd& CoordsNewB, MatrixXd& DifCoordsNewB, MatrixXd& CoordsNewC, MatrixXd& DifCoordsNewC, MatrixXd& CoordsNewD, MatrixXd& DifCoordsNewD) {
 	ofstream myfile;
 	myfile.open(coordsFile);
 	myfile << CoordsNewA << "\n\n";
@@ -433,7 +637,7 @@ void Mesh3DScene::SaveCoordsToFile(const string coordsFile, Eigen::MatrixXd& Coo
 	myfile.close();
 }
 
-void Mesh3DScene::ReadCoordsFromFile(const string coordsFile, Eigen::MatrixXd& CoordsNewA, Eigen::MatrixXd& DifCoordsNewA, Eigen::MatrixXd& CoordsNewB, Eigen::MatrixXd& DifCoordsNewB, Eigen::MatrixXd& CoordsNewC, Eigen::MatrixXd& DifCoordsNewC, Eigen::MatrixXd& CoordsNewD, Eigen::MatrixXd& DifCoordsNewD, int verticesCount) {
+void Mesh3DScene::ReadCoordsFromFile(const string coordsFile, MatrixXd& CoordsNewA, MatrixXd& DifCoordsNewA, MatrixXd& CoordsNewB, MatrixXd& DifCoordsNewB, MatrixXd& CoordsNewC, MatrixXd& DifCoordsNewC, MatrixXd& CoordsNewD, MatrixXd& DifCoordsNewD, int verticesCount) {
 	int count;
 	ifstream myfile;
 	myfile.open(coordsFile);
@@ -492,12 +696,20 @@ void Mesh3DScene::ReadCoordsFromFile(const string coordsFile, Eigen::MatrixXd& C
 	CoordsToModel(m_model_newD.getVertices(), CoordsNewD, verticesCount);
 }
 
-void Mesh3DScene::CoordsToModel(std::vector<vec>& m_vertices_new, Eigen::MatrixXd& CoordsNew, int verticesCount) {
+void Mesh3DScene::CoordsToModel(std::vector<vec>& m_vertices_new, MatrixXd& CoordsNew, int verticesCount) {
 	for (int i = 0; i < verticesCount; i++) {
 		m_vertices_new[i].x = CoordsNew(i, 0);
 		m_vertices_new[i].y = CoordsNew(i, 1);
 		m_vertices_new[i].z = CoordsNew(i, 2);
 	}
+}
+
+double Mesh3DScene::CalculateError(VectorXd& l1, VectorXd& l2) {
+	double error = 0;
+	for (int i = 0; i < SAMPLE_POINTS; i++) {
+		error += (((sqrt(l1(i)) - sqrt(l2(i))) * (sqrt(l1(i)) - sqrt(l2(i)))) / (sqrt(l1(i)) + sqrt(l2(i))));
+	}
+	return 0.5 * error;
 }
 
 void Mesh3DScene::arrowEvent(ArrowDir dir, int modif)
@@ -657,4 +869,57 @@ double FindMax(MatrixXd& M, int n, int index) {
 			max = M(i, index);
 	}
 	return max;
+}
+
+void shuffle_arr(int* arr, size_t n) {
+	if (n > 1) {
+		size_t i;
+		srand(time(NULL));
+		for (i = 0; i < n - 1; i++) {
+			size_t j = i + rand() / (RAND_MAX / (n - i) + 1);
+			int t = arr[j];
+			arr[j] = arr[i];
+			arr[i] = t;
+		}
+	}
+}
+
+double dist(vec v1, vec v2) {
+	return sqrt((v1.x - v2.x) * (v1.x - v2.x) + (v1.y - v2.y) * (v1.y - v2.y) + (v1.z - v2.z) * (v1.z - v2.z));
+}
+
+double geodesicDist(vector<vec>& vertices, vector<vvr::Triangle>& triangles, int index1, int index2) {
+	computeDist(vertices, triangles, index1);
+}
+
+void computeDist(vector<vec>& vertices, vector<vvr::Triangle>& triangles, int index1) {
+	VectorXd distances(vertices.size());
+	for (int i = 0; i < vertices.size(); i++) {
+		distances(i) = 1e5;
+	}
+	distances(index1) = 0;
+	VectorXd visited = VectorXd::Zero(vertices.size());
+	visited(index1) = 1;
+	int toBeVisited = vertices.size();
+	while (toBeVisited > 0) {
+		double smallest = 1e6;
+		int next = -1;
+		for (int i = 0; i < vertices.size(); i++) {
+			if (distances(i) < smallest && visited(i) == 0) {
+				smallest = distances(i);
+				next = i;
+			}
+		}
+		toBeVisited--;
+		visited(next) = 1;
+		for (int i = 0; i < vertices.size(); i++) {
+			for (int j = 0; i < triangles.size(); j++) {
+				if ((triangles[j].v1 == i || triangles[j].v2 == i || triangles[j].v3 == i) && (triangles[i].v1 == next || triangles[i].v2 == next || triangles[i].v3 == next)) {
+					if (visited(i) == 0 && (distances(next) + dist(vertices[next], vertices[i]) < distances(i))) {
+						distances(i) = distances(next) + dist(vertices[next], vertices[i]);
+					}
+				}
+			}
+		}
+	}
 }
