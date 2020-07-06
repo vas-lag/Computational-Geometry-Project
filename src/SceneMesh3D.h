@@ -47,16 +47,20 @@ private:
 	void Task3Sub(Eigen::MatrixXd& Q, Eigen::MatrixXd& Coords, Eigen::MatrixXd& DifCoords, Eigen::MatrixXd& CoordsNew, Eigen::MatrixXd& DifCoordsNew, std::vector<vec>& m_vertices_new, int verticesCount, double ratio, Eigen::SparseMatrix<double>& L);
 	void Task4(const Eigen::MatrixXd& Coords, const Eigen::MatrixXd& CoordsNewA, const Eigen::MatrixXd& CoordsNewB, const Eigen::MatrixXd& CoordsNewC, const Eigen::MatrixXd& CoordsNewD, const Eigen::MatrixXd& DifCoords, const Eigen::MatrixXd& DifCoordsNewA, const Eigen::MatrixXd& DifCoordsNewB, const Eigen::MatrixXd& DifCoordsNewC, const Eigen::MatrixXd& DifCoordsNewD, const Eigen::MatrixXd& L);
 	void Task4Sub(std::vector<vvr::Triangle>& m_triangles, std::vector<vec>& m_vertices_new, std::vector<vvr::Point3D>& m_points_coords_3D, std::vector<vvr::Triangle3D>& m_triangles_coords3D, std::vector<vvr::Point3D>& m_points_difCoords_3D, std::vector<vvr::Triangle3D>& m_triangles_difCoords3D, const Eigen::MatrixXd& Coords, const Eigen::MatrixXd& CoordsNew, const Eigen::MatrixXd& DifCoords, const Eigen::MatrixXd& DifCoordsNew, const Eigen::MatrixXd& L);
-	void Task5A();
+	void Task5A(int verts, Eigen::VectorXd& eigenVal);
 	void Task5B();
+	void Task5C();
 	void GetDifCoordsInNormalDirection(std::vector<vvr::Triangle>& m_triangles, std::vector<vec>& m_vertices, Eigen::MatrixXd& DifCoords, Eigen::MatrixXd& newDifCoords);
 	void ComputeEigenDecomposition(Eigen::MatrixXd& Ls, Eigen::VectorXd& eigenValues, Eigen::MatrixXd& eigenVectors);
 	void SaveEigenToFile(const std::string eigenFile, Eigen::VectorXd& eigenValues, Eigen::MatrixXd& eigenVectors, int verticesCount);
 	void ReadEigenFromFile(const std::string eigenFile, Eigen::VectorXd& eigenValues, Eigen::MatrixXd& eigenVectors, int verticesCount);
 	void SaveCoordsToFile(const std::string coordsFile, Eigen::MatrixXd& CoordsNewA, Eigen::MatrixXd& DifCoordsNewA, Eigen::MatrixXd& CoordsNewB, Eigen::MatrixXd& DifCoordsNewB, Eigen::MatrixXd& CoordsNewC, Eigen::MatrixXd& DifCoordsNewC, Eigen::MatrixXd& CoordsNewD, Eigen::MatrixXd& DifCoordsNewD);
 	void ReadCoordsFromFile(const std::string coordsFile, Eigen::MatrixXd& CoordsNewA, Eigen::MatrixXd& DifCoordsNewA, Eigen::MatrixXd& CoordsNewB, Eigen::MatrixXd& DifCoordsNewB, Eigen::MatrixXd& CoordsNewC, Eigen::MatrixXd& DifCoordsNewC, Eigen::MatrixXd& CoordsNewD, Eigen::MatrixXd& DifCoordsNewD, int verticesCount);
+	void SaveGeodesicToFile(Eigen::VectorXd eigenValues[]);
+	void ReadGeodesicFromFile(Eigen::VectorXd eigenValues[]);
 	void CoordsToModel(std::vector<vec>& m_vertices_new, Eigen::MatrixXd& CoordsNew, int verticesCount);
 	double CalculateError(Eigen::VectorXd& l1, Eigen::VectorXd& l2);
+	void printResult(double errors[]);
 
 private:
 	int m_style_flag, ratio_flag;
@@ -75,6 +79,7 @@ private:
 	std::vector<vvr::Point3D> *m_points_coords3D_draw, *m_points_difCoords3D_draw;
 	std::vector<vvr::Triangle3D> m_triangles3D, m_triangles_coords3DA, m_triangles_difCoords3DA, m_triangles_coords3DB, m_triangles_difCoords3DB, m_triangles_coords3DC, m_triangles_difCoords3DC, m_triangles_coords3DD, m_triangles_difCoords3DD;
 	std::vector<vvr::Triangle3D> *m_triangles_coords3D_draw, *m_triangles_difCoords3D_draw;
+	std::vector<std::string> files, originalFiles;
 };
 
 void SparseIdentity(Eigen::SparseMatrix<double>& I, int n);
@@ -82,3 +87,5 @@ void SparseDiagonalInverse(Eigen::SparseMatrix<double>& D, Eigen::SparseMatrix<d
 double FindMax(Eigen::MatrixXd& M, int n, int index);
 void shuffle_arr(int* arr, size_t n);
 double dist(vec v1, vec v2);
+int geodesicDist(std::vector<vec>& vertices, int* verticesSelected, int count, Eigen::MatrixXd& A, Eigen::MatrixXd& distance);
+void computeDist(std::vector<vec>& vertices, int index1, Eigen::VectorXd& distances, Eigen::MatrixXd& A);
