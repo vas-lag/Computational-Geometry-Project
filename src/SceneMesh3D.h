@@ -84,7 +84,6 @@ private:
 
 void SparseIdentity(Eigen::SparseMatrix<double>& I, int n);
 void SparseDiagonalInverse(Eigen::SparseMatrix<double>& D, Eigen::SparseMatrix<double>& D_inverse, int n);
-double FindMax(Eigen::MatrixXd& M, int n, int index);
 void shuffle_arr(int* arr, size_t n);
 double dist(vec v1, vec v2);
 int geodesicDist(std::vector<vec>& vertices, int* verticesSelected, int count, Eigen::MatrixXd& A, Eigen::MatrixXd& distance);

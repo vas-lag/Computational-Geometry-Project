@@ -1,14 +1,15 @@
 #include "SceneMesh3D.h"
 #include "ctime"
 
-#define FILENAME "hand2"
+#define FILENAME "unicorn_low_low"
 #define CONTROL_POINTS 1
+#define DYNAMIC_RECONSTRUCTION 0
 #define SAMPLE_POINTS 50
 #define SECTION_SIZE 0.5
-#define NUM_OF_FILES 18
+#define NUM_OF_FILES 17
 
 #define COMPUTE_EIGENDECOMP 0
-#define COMPUTE_COORDS 0
+#define COMPUTE_COORDS 1
 #define COMPUTE_GEODESIC 0
 
 using namespace std;
@@ -37,7 +38,7 @@ Mesh3DScene::Mesh3DScene()
 	m_triangles_difCoords3D_draw = &m_triangles_difCoords3DA;
 	originalFiles = { "armadillo_low_low", "b66_L2", "bone", "bunny_low", "cube", "dolphin", "dragon_low_low",
 		"flashlight", "flashlightNoCentered", "hand2", "icosahedron", "phone_v02", "polyhedron",
-		"suzanne", "teapotMultiMesh", "unicorn_low", "unicorn_low_low", "vvrlab" };
+		"suzanne", "unicorn_low", "unicorn_low_low", "vvrlab" };
 	reset();
 }
 
@@ -158,13 +159,9 @@ void Mesh3DScene::Task1(vector<vvr::Triangle>& m_triangles, vector<vec>& m_verti
 	}
 
 	DifCoords = L * Coords;
-
-	//find max of dif coords on each axis
-	double maxX = FindMax(DifCoords, verticesCount, 0);
-	double maxY = FindMax(DifCoords, verticesCount, 1);
-	double maxZ = FindMax(DifCoords, verticesCount, 2);
 	MatrixXd newDifCoords(verticesCount, 3);
 	GetDifCoordsInNormalDirection(m_triangles, m_vertices, DifCoords, newDifCoords);
+	cout << "here" << endl;
 	//compute the magnitude of the dif coords of all the vertices
 	VectorXd DifCoordsMagnitude(verticesCount);
 	double maxMag = 0;
@@ -257,9 +254,7 @@ void Mesh3DScene::Task3Sub(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, M
 	shuffle_arr(options, verticesCount);
 
 	cout << "model reconstruction using "<< 100 * ratio <<"% of eigenvectors begins:" << endl;
-	//int rank;
 	int dimCount = verticesCount;
-	//SparseQR <SparseMatrix<double>, COLAMDOrdering<int>> col_decomp;
 	SimplicialLLT<SparseMatrix<double>> llt;
 	while (true) {
 		dimCount++;
@@ -277,8 +272,14 @@ void Mesh3DScene::Task3Sub(MatrixXd& Q, MatrixXd& Coords, MatrixXd& DifCoords, M
 		llt.compute(L.transpose() * L);
 		double det = llt.determinant();
 
-		if (abs(det) > 0 && count >= CONTROL_POINTS - 1) {
-			cout << "det = " << det << "	count = " << count <<endl;
+		if (!DYNAMIC_RECONSTRUCTION) {
+			if (count >= CONTROL_POINTS - 1) {
+				cout << "det = " << det << "	control points used = " << count + 1 << endl;
+				break;
+			}
+		}
+		else if (abs(det) > 0) {
+			cout << "det = " << det << "	control points used = " << count + 1 << endl;
 			break;
 		}
 	}
@@ -352,6 +353,7 @@ void Mesh3DScene::Task4Sub(vector<vvr::Triangle>& m_triangles, vector<vec>& m_ve
 }
 
 void Mesh3DScene::Task5A(int verts, VectorXd& eigenVal) {
+	cout << "\n\nShape Indexing using Ls eigenvalues" << endl;
 	files = originalFiles;
 	const string eigenDir = getBasePath() + "resources/eigen/";
 	int verticesCount[NUM_OF_FILES + 1];
@@ -414,12 +416,13 @@ void Mesh3DScene::Task5A(int verts, VectorXd& eigenVal) {
 	printResult(errors);
 
 	for (int i = 0; i < NUM_OF_FILES + 1; i++) {
-		delete[] eigenSections[i];
+		//delete[] eigenSections[i];
 	}
-	delete[] eigenSections;
+	//delete[] eigenSections;
 }
 
 void Mesh3DScene::Task5B() {
+	cout << "\n\nShape Indexing using euclidian distances" << endl;
 	files = originalFiles;
 	const string objDir = getBasePath() + "resources/obj/";
 	double*** distances = new double** [NUM_OF_FILES + 1];
@@ -438,7 +441,7 @@ void Mesh3DScene::Task5B() {
 		m_model_other = Mesh(objFile);
 		vector<vec>& vertices = m_model_other.getVertices();
 		vec* verticesSelected = new vec[SAMPLE_POINTS];
-		verticesSelected[0] = vertices[0];       //vertices[rand() % vertices.size()];
+		verticesSelected[0] = vertices[rand() % vertices.size()];       //vertices[rand() % vertices.size()];  //vertices[0];
 		for (int j = 1; j < SAMPLE_POINTS; j++) {
 			double biggestScore = -1;
 			int biggestIndex = -1;
@@ -504,6 +507,7 @@ void Mesh3DScene::Task5B() {
 }
 
 void Mesh3DScene::Task5C() {
+	cout << "\n\nShape Indexing using geodesic distances" << endl;
 	files = originalFiles;
 	const string objDir = getBasePath() + "resources/obj/";
 	double*** distances = new double** [NUM_OF_FILES + 1];
@@ -792,7 +796,7 @@ void Mesh3DScene::printResult(double errors[]) {
 			}
 		}
 	}
-	cout << "\nGiven the model \"" << FILENAME << "\" the most similar shapes and their errors in decreasing order are:\n" << endl;
+	cout << "\nGiven the model \"" << FILENAME << "\" the most similar shapes in decreasing order of similarity and their errors are:\n" << endl;
 	for (int i = 0; i < NUM_OF_FILES; i++) {
 		cout << files[i] << "  " << errors[i] << endl;
 	}
@@ -946,15 +950,6 @@ void SparseDiagonalInverse(SparseMatrix<double>& D, SparseMatrix<double>& D_inve
 	for (int i = 0; i < n; i++) {
 		D_inverse.coeffRef(i, i) = 1 / D.coeffRef(i, i);
 	}
-}
-
-double FindMax(MatrixXd& M, int n, int index) {
-	int max = 0;
-	for (int i = 0; i < n; i++) {
-		if (M(i, index) > max)
-			max = M(i, index);
-	}
-	return max;
 }
 
 void shuffle_arr(int* arr, size_t n) {
