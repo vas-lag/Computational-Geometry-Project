@@ -1,0 +1,4 @@
+build/
+resources/eigen/
+resources/coords/
+/resources/geodesic
